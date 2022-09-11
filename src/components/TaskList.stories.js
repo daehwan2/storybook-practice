@@ -3,17 +3,11 @@ import React from "react";
 import TaskList from "./TaskList";
 import * as TaskStories from "./Task.stories";
 
-export default {
-  component: TaskList,
-  title: "TaskList",
-  decorators: [(story) => <div style={{ padding: "3rem" }}>{story()}</div>],
-  // 데코레이터(decorators)는 스토리에 임ㅇ의의 래퍼를 제공하는 한 방법.
-};
+import { Provider } from "react-redux";
 
-const Template = (args) => <TaskList {...args} />;
+import { configureStore, createSlice } from "@reduxjs/toolkit";
 
-export const Default = Template.bind({});
-Default.args = {
+export const MockedState = {
   tasks: [
     { ...TaskStories.Default.args.task, id: "1", title: "Task1" },
     { ...TaskStories.Default.args.task, id: "2", title: "Task2" },
@@ -22,24 +16,90 @@ Default.args = {
     { ...TaskStories.Default.args.task, id: "5", title: "Task5" },
     { ...TaskStories.Default.args.task, id: "6", title: "Task6" },
   ],
+  status: "idle",
+  error: null,
 };
+
+const Mockstore = ({ taskboxState, children }) => (
+  <Provider
+    store={configureStore({
+      reducer: {
+        taskbox: createSlice({
+          name: "taskbox",
+          initialState: taskboxState,
+          reducers: {
+            updateTaskState: (state, action) => {
+              const { id, newTaskState } = action.payload;
+              const task = state.tasks.findIndex((task) => task.id === id);
+              if (task >= 0) {
+                state.tasks[task].state = newTaskState;
+              }
+            },
+          },
+        }).reducer,
+      },
+    })}>
+    {children}
+  </Provider>
+);
+
+export default {
+  component: TaskList,
+  title: "TaskList",
+  // 데코레이터(decorators)는 스토리에 임의의 래퍼를 제공하는 한 방법.
+  decorators: [(story) => <div style={{ padding: "3rem" }}>{story()}</div>],
+  excludeStories: /.*MockedState$/,
+};
+
+const Template = () => <TaskList />;
+
+export const Default = Template.bind({});
+Default.decorators = [
+  (story) => <Mockstore taskboxState={MockedState}>{story()}</Mockstore>,
+];
 
 export const WithPinnedTasks = Template.bind({});
-WithPinnedTasks.args = {
-  tasks: [
-    ...Default.args.tasks.slice(0, 5),
-    { id: "6", title: "Task6(pinned)", state: "TASK_PINNED" },
-  ],
-};
+WithPinnedTasks.decorators = [
+  (story) => {
+    const pinnedtasks = [
+      ...MockedState.tasks.slice(0, 5),
+      { id: "6", title: "Task6(pinned)", state: "TASK_PINNED" },
+    ];
+
+    return (
+      <Mockstore
+        taskboxState={{
+          ...MockedState,
+          tasks: pinnedtasks,
+        }}>
+        {story()}
+      </Mockstore>
+    );
+  },
+];
 
 export const Loading = Template.bind({});
-Loading.args = {
-  tasks: [],
-  loading: true,
-};
+Loading.decorators = [
+  (story) => (
+    <Mockstore
+      taskboxState={{
+        ...MockedState,
+        status: "loading",
+      }}>
+      {story()}
+    </Mockstore>
+  ),
+];
 
 export const Empty = Template.bind({});
-Empty.args = {
-  ...Loading.args,
-  loading: false,
-};
+Empty.decorators = [
+  (story) => (
+    <Mockstore
+      taskboxState={{
+        ...MockedState,
+        tasks: [],
+      }}>
+      {story()}
+    </Mockstore>
+  ),
+];
